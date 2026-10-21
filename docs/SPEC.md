@@ -28,7 +28,7 @@ provenix/
 │   ├── blobs/                 # LocalBlobStore
 │   └── checkouts/<snapshot_id>/   # repo checkouts for ingestion and read_file
 ├── backend/
-│   ├── Dockerfile             # Python 3.12 + WeasyPrint system libraries
+│   ├── Dockerfile             # Python 3.13 + WeasyPrint system libraries
 │   ├── pyproject.toml         # uv-managed
 │   ├── alembic.ini
 │   ├── migrations/            # Alembic versions
