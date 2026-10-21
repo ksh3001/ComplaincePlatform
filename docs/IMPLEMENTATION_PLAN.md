@@ -8,6 +8,28 @@ Calendar fit: M0–M1 = week 1, M2–M3 = week 2, M4 = week 3, M5 = week 4, M6 =
 
 ---
 
+## Scope control (POC scale)
+
+The POC question is "do findings agree with an expert?". Anything that does not feed that measurement is
+cuttable. If you are more than ~3 days behind at the end of a milestone, cut in this order:
+
+1. **T24 tracing** — `llm_call` is enough.
+2. **T15 app C** — keep app D (false-positive test); app C is the third gap-bearing app.
+3. **T28 PDF report** — fall back to a single HTML page printed to PDF; drop the per-finding pages.
+4. **T25 SSE timeline** — fall back to polling `GET /assessments/{id}` every 2 s.
+
+Further trims (spec §4, §12, §14 need a matching edit by you when adopted):
+- **T09/T14:** onboarding may be one or two plain forms instead of a four-step wizard.
+- **T23 remediation:** optional; skip unless the SME wants remediation in the report.
+- **T25:** polling status page preferred over SSE; if so, T18 drops the SSE endpoint.
+- **T10/T15:** three sample apps (A, B, D) are enough; app C is dropped.
+
+Deferrals already applied below: Azure adapters move to T21 (written when first exercised), GitHub cloning is
+optional (local path is enough for samples), DOCX parsing is optional (PDF and Markdown cover the samples),
+and T17 is folded into T16.
+
+---
+
 ## How to work
 
 1. **One task per session.** Start a fresh session (`/clear`) for each task. The agent reads `CLAUDE.md`
@@ -93,11 +115,11 @@ databases. Integration test: insert and read back one row per table.
 ```
 Task T05: ports and adapters. Read docs/SPEC.md §5.
 Protocols in app/ports/. Adapters: FakeLLM (canned responses registered by prompt_id, records calls),
-FakeEmbedder (deterministic hash vectors, dims 1536), LocalBlobStore, LocalGit, GitHubGit (shallow clone,
-token from settings), and AzureOpenAILLM + AzureOpenAIEmbedder using the openai SDK with structured outputs
-(written now, exercised later). app/wiring.py picks adapters from LLM_PROVIDER. The LLM adapters write an
-llm_call row per call and enforce the token budget (BudgetExceeded). Unit tests for the fakes, LocalGit and
-the budget logic; no test calls Azure.
+FakeEmbedder (deterministic hash vectors, dims 1536), LocalBlobStore, LocalGit. GitHubGit (shallow clone,
+token from settings) is optional: add it only if you need to assess a real GitHub repo. The Azure adapters
+are NOT written here; they arrive in T21 when first exercised. app/wiring.py picks adapters from
+LLM_PROVIDER. The llm_call row writing and token budget (BudgetExceeded) live in a wrapper around any
+LLMClient so they apply to Azure later. Unit tests for the fakes, LocalGit and the budget logic.
 ```
 
 ### T06 — Control pack `[plan]`
@@ -180,8 +202,8 @@ terms. Returns the shapes in §9. Tests with FakeEmbedder showing keyword boost 
 ### T13 — Document ingestion
 ```
 Task T13: document ingestion. Read docs/SPEC.md §3 (document, chunk), §4 (POST documents).
-Multipart upload of PDF, DOCX, MD; store in BlobStore; arq job parses (PyMuPDF for PDF with page numbers,
-python-docx with headings as sections, Markdown by heading), chunks ~800 tokens with page/section anchors,
+Multipart upload of PDF and MD (DOCX optional, add only if a sample needs it); store in BlobStore; arq job
+parses (PyMuPDF for PDF with page numbers, Markdown by heading, python-docx with headings if DOCX), chunks ~800 tokens with page/section anchors,
 embeds, stores chunks, sets status. Tests with a small PDF and DOCX fixture.
 ```
 
@@ -217,7 +239,7 @@ connects the repo and uploads its docs.
 ```
 **Done when:** all four sample apps classify as §14 expects. **Ask the SME to review §11 rules and the test cases.**
 
-### T17 — Classification in the UI
+### T17 — Classification in the UI (fold into T16 in the same session; keep the heading for numbering)
 ```
 Task T17: show classification. On the onboarding summary and application page, show the tier badge,
 roles, and the rule trace as a short list ("Annex III area: employment → high-risk", with the question it
@@ -266,7 +288,8 @@ offline. Snapshot tests of rendered prompts.
 ### T21 — Real assess_control node `[plan]`
 ```
 Task T21: implement assess_control. Read docs/SPEC.md §8, §9, §10.
-Fan out with Send per control id. Each branch: gather via LLMClient.tool_loop (max 12 steps) with the tools,
+First write AzureOpenAILLM and AzureOpenAIEmbedder (openai SDK, structured outputs) behind the ports, wrapped
+by the T05 llm_call/budget wrapper. Fan out with Send per control id. Each branch: gather via LLMClient.tool_loop (max 12 steps) with the tools,
 then map via LLMClient.structured into MapResult, validating that evidence_ids belong to this control;
 write the finding. Catch errors per branch → not_assessable with the error. Cap concurrency at 4.
 Emit per-control events with evidence counts. Test with FakeLLM. Then, with LLM_PROVIDER=azure, run once on
